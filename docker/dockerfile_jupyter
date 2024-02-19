@@ -1,5 +1,11 @@
-FROM python-prefab-dev
+FROM python:3.11
+
+COPY /requirements /requirements
+RUN pip install -r ./requirements/dev.txt
 
 RUN pip install jupyter
+
+COPY /data /data
+COPY /src /src
 
 ENTRYPOINT ["jupyter", "notebook", "--ip", "0.0.0.0", "--port", "8888", "--no-browser", "--allow-root"]

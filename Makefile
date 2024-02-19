@@ -1,4 +1,4 @@
-project_name ?= python-prefab
+project_name ?= multi-agent-ai
 
 jupyter_name = ${project_name}-jupyter
 test_name = ${project_name}-test
@@ -30,20 +30,12 @@ run_jupyter: build_jupyter
 	--mount type=bind,source=./src,target=/src \
 	-it -p ${jupyter_port}:${jupyter_port} ${jupyter_name}
 
-run_backend: build_dev
+run_script: build_dev
 	docker rm --force ${backend_name}
 	docker run --name ${backend_name} \
+	--mount type=bind,source=./data,target=/data \
 	-it -p ${backend_port}:${backend_port} ${dev_name} \
 	python /src/backend/main_backend.py
-
-run_frontend: build_dev
-	docker rm --force ${frontend_name}
-	docker run --name ${frontend_name} \
-	-it -p ${frontend_port}:${frontend_port} ${dev_name} \
-	streamlit run /src/frontend/main_frontend.py --server.port=${frontend_port} --server.address=0.0.0.0
-
-run_all: build_all
-	docker compose -f ./docker/compose.yaml up
 
 # TEST COMMANDS
 test: build_test
@@ -58,7 +50,6 @@ clean:
 	docker rm --force ${jupyter_name}
 	docker rm --force ${frontend_name}
 	docker rm --force ${backend_name}
-	docker compose -f ./docker/compose.yaml down
 	mv ./docs/build/.gitignore ./docs/.gitignore
 	rm -rf ./docs/build/
 	mkdir ./docs/build/
