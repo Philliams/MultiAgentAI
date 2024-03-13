@@ -55,6 +55,25 @@ class SnakeGame:
 
         self.add_frame()
 
+    def terminated(self):
+        x1, y1 = self.pos1
+        x2, y2 = self.pos2
+
+        if (x1 == x2) and (y1 == y2):
+            return Result.TIE
+        elif self.state[x1, y1] != 0 and self.state[x2, y2] != 0:
+            return Result.TIE
+        elif self.state[x1, y1] != 0:
+            return Result.LOSE
+        elif self.state[x2, y2] != 0:
+            return Result.LOSE
+        
+        return False
+
+
+    def reward_function(self):
+        return (0,0)
+
     def step(self):
 
         m1 = self.agent1.step(self.state, self.pos1)
@@ -71,27 +90,28 @@ class SnakeGame:
 
         self.add_frame()
 
+        done = self.terminated()
+        reward = self.reward_function()
+
+        # Assumes full observability of the environment
+        s_prime = self.state.copy()
+
+        return done,reward,s_prime
+
+
     def play(self, max_steps = 100000000):
 
-        while True:
+        done = False
+
+        while not done:
 
             max_steps -= 1
             if max_steps <= 0:
                 raise Exception("Game Failed to terminate in max steps.")
 
-            self.step()
-
-            x1, y1 = self.pos1
-            x2, y2 = self.pos2
-
-            if (x1 == x2) and (y1 == y2):
-                return Result.TIE
-            elif self.state[x1, y1] != 0 and self.state[x2, y2] != 0:
-                return Result.TIE
-            elif self.state[x1, y1] != 0:
-                return Result.LOSE
-            elif self.state[x2, y2] != 0:
-                return Result.LOSE
+            done,_,_= self.step()
+            
+        return done
 
     def move_update(self, pos:tuple[int, int], move:Move) -> tuple[int, int]:
         x, y = pos
