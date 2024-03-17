@@ -81,13 +81,18 @@ if __name__ == '__main__':
     '''
 
     # Make the environment 
-    grid_size = 5 
+    grid_size = 9 
     a1s = []
     a2s = []
 
-    for _ in range(100):
+    for _ in range(int(1e6)):
         a1, a2 = play_game(grid_size)
         a1s.append(a1)
         a2s.append(a2)
 
-    print(a1s[0].value_table) 
+    # Make value matrix for each state (average over all games played), will choose state with the most value
+    a1_avg_value = np.divide((np.stack([a.value_table for a in a1s]) + 1e-6), (np.stack([a.count_table for a in a1s]) + 1e-6)).mean(axis=0)
+    a2_avg_value = np.divide((np.stack([a.value_table for a in a2s]) + 1e-6), (np.stack([a.count_table for a in a2s]) + 1e-6)).mean(axis=0)
+
+    np.save('a1_avg_value.npy', a1_avg_value)
+    np.save('a2_avg_value.npy', a2_avg_value)
