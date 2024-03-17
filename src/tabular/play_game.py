@@ -62,6 +62,7 @@ def play_game(n:int) -> np.ndarray:
 
         if done:
             break
+    print(f'Got reward: {r}')
     return done 
 
 

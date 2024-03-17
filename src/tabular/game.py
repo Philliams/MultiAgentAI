@@ -57,9 +57,6 @@ class SnakeGame:
 
         return False
 
-    def reward(self):
-        return (0,0)
-
     def step(self, m1:Move, m2:Move):
         self.steps += 1
         x1, y1 = self.pos1
