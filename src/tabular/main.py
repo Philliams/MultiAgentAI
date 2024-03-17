@@ -49,22 +49,11 @@ class Random_Agent():
         return rm
 
 
-if __name__ == '__main__':
-    '''
-    Just going to create a value table for the environment
-    Then I create an agent that moves in the optimal direction
-    '''
+def play_game(n:int) -> np.ndarray:
+    env = SnakeGame(n)
+    ra1 = Random_Agent(env.pos1, n)
+    ra2 = Random_Agent(env.pos2, n)
 
-    # Make the environment 
-    grid_size = 5 
-    env = SnakeGame(n=grid_size)
-
-    # Create the agents
-    ra1 = Random_Agent(env.pos1, grid_size)
-    ra2 = Random_Agent(env.pos2, grid_size)
-
-    # Play the game
-    c = 0
     while True:
         # Player 1
         move1 = ra1.action(env.state)
@@ -79,12 +68,26 @@ if __name__ == '__main__':
         ra1.pos = s[0]
         ra2.pos = s[1]
 
-        c += 1
-        if done or c == 4:
-            print('Rewards for player 1')
-            print(ra1.value_table)
-            print(ra1.count_table)
+        if done:
             break
 
-    # Print the value table 
-    
+    return ra1, ra2
+
+
+if __name__ == '__main__':
+    '''
+    Just going to create a value table for the environment
+    Then I create an agent that moves in the optimal direction
+    '''
+
+    # Make the environment 
+    grid_size = 5 
+    a1s = []
+    a2s = []
+
+    for _ in range(100):
+        a1, a2 = play_game(grid_size)
+        a1s.append(a1)
+        a2s.append(a2)
+
+    print(a1s[0].value_table) 
