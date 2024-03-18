@@ -77,6 +77,7 @@ if __name__ == '__main__':
     r_all = []
 
     for _ in range(int(1e1)):
+        # This is deterministic, so the reward should be the same every time
         r = play_game(grid_size)
         r_all.append(r)
     print(r_all)
