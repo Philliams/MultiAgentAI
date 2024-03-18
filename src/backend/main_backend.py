@@ -73,12 +73,12 @@ class VoronoiAgent:
     def __init__(self, id:int, forward_steps:int = 1):
         self.n = forward_steps
         self.id = id
+        self.n = forward_steps - 1
+        self.iter = 0
 
-    def get_valid_moves(self, board_state, pos):
+    def get_valid_moves(self, pos, board_state):
         x, y = pos
-
         valid_moves = []
-
         if board_state[x+1][y] == 0:
             valid_moves.append(Move.RIGHT)
         if board_state[x-1][y] == 0:
@@ -87,10 +87,9 @@ class VoronoiAgent:
             valid_moves.append(Move.UP)
         if board_state[x][y-1] == 0:
             valid_moves.append(Move.DOWN)
-
         return valid_moves
     
-    def move_update(self, pos:tuple[int, int], move:Move) -> tuple[int, int]:
+    def get_move_update(self, pos, move):
         x, y = pos
         if move == Move.UP:
             return (x, y+1)
@@ -101,109 +100,83 @@ class VoronoiAgent:
         if move == Move.RIGHT:
             return (x+1, y)
 
-    def recursive_explore_moves(self, board_state, pos1, pos2, depth):
+    def step(self, board_state, pos: tuple[int, int], other_pos: tuple[int, int]):
+        return self.recursive_step(board_state, pos, other_pos, self.n)[0]
 
-        valid_moves_1 = self.get_valid_moves(board_state, pos1)
-        valid_moves_2 = self.get_valid_moves(board_state, pos2)
+    def recursive_step(self, board_state, pos, other_pos, depth) -> Move:
+        
+        average_rewards = {}
 
-        average_advantage = {}
+        valid1 = self.get_valid_moves(pos, board_state)
+        valid2 = self.get_valid_moves(other_pos, board_state)
 
-        if depth == 0:
+        for v1 in valid1:
 
-            for v1 in valid_moves_1:
+            average_rewards[v1] = 0
 
-                average_advantage[v1] = 0
+            for v2 in valid2:
 
-                for v2 in valid_moves_2:
-                    x1, y1 = self.move_update(pos1, v1)
-                    x2, y2 = self.move_update(pos2, v2)
+                x1, y1 = self.get_move_update(pos, v1)
+                x2, y2 = self.get_move_update(other_pos, v2)
+                board_state_ = board_state.copy()
 
-                    if (x1, y1) == (x2, y2) or (x1, y1) == pos2:
-                        # collision with each other
-                        # this can be tuned to reduce/increase risk taking
-                        average_advantage[v1] -= board_state.size / len(valid_moves_2)
-                    elif (x2, y2) == pos1:
-                        average_advantage[v1] += board_state.size / len(valid_moves_2)
-                    else:
-                        bfs1 = self.bfs((x1, y1), board_state)
-                        bfs2 = self.bfs((x2, y2), board_state)
+                if depth == 0:
 
-                        advantage = np.sum(bfs1 < bfs2)
-                        disadvantage = np.sum(bfs1 > bfs2)
-                        # squares we can reach first - squares they can reach first
-                        average_advantage[v1] += (advantage - disadvantage) / len(valid_moves_2)
+                    bfs1 = self.bfs((x1, y1), board_state_.copy())
+                    bfs2 = self.bfs((x2, y2), board_state_.copy())
 
-            # return best move and reward
-            if len(average_advantage.keys()) > 0:
-                optimal = max(average_advantage.items(), key=operator.itemgetter(1))
-                return optimal
-            else:
-                return (Move.UP, -board_state.size)
 
+
+                    r = (
+                        np.count_nonzero(bfs1)
+                        # - np.count_nonzero(bfs2)
+                        + np.sum(bfs1 < bfs2)
+                        # - np.sum(bfs1 > bfs2)
+                    )
+                    average_rewards[v1] += r / len(valid2)
+
+                else:
+                    board_state_[x1, y1] = self.id
+                    board_state_[x2, y2] = self.id
+                    _, r = self.recursive_step(board_state_, (x1, y1), (x2, y2), depth - 1)
+                    average_rewards[v1] += r / len(valid2)
+        
+        if len(average_rewards.keys()) > 0:
+            optimal = max(average_rewards.items(), key=operator.itemgetter(1))
+            return optimal
         else:
-
-            average_advantage = {}
-
-            for v1 in valid_moves_1:
-
-                average_advantage[v1] = 0
-
-                for v2 in valid_moves_2:
-                    x1, y1 = self.move_update(pos1, v1)
-                    x2, y2 = self.move_update(pos2, v2)
-
-                    if (x1 == x2) and (y1 == y2):
-                        average_advantage[v1] -= board_state.size / len(valid_moves_2)
-                    else:
-                        board_state_ = board_state.copy()
-                        board_state_[x1, y1] = -1
-                        board_state_[x2, y2] = -1
-
-                        _, reward = self.recursive_explore_moves(board_state_, (x1, y1), (x2, y2), depth - 1)
-                        average_advantage[v1] += reward / len(valid_moves_2)
-
-            if len(average_advantage.keys()) > 0:
-                optimal = max(average_advantage.items(), key=operator.itemgetter(1))
-                return optimal
-            else:
-                return (Move.UP, -board_state.size)
-
-    
-    def step(self, board_state, pos: tuple[int, int], other_pos: tuple[int, int]) -> Move:
-        move, reward = self.recursive_explore_moves(board_state, pos, other_pos, self.n - 1)
-        return move
+            return (Move.UP, -board_state.size)
 
     def bfs(self, pos, board_state):
-
-        deltas = [
-            (-1, 0), # left
-            (1, 0), # right
-            (0, 1), # up
-            (0, -1) # down
-        ]
-
-        distances = np.zeros(board_state.shape)
+        board_state = board_state.copy()
         visited = np.full(board_state.shape, False)
+        distances = np.zeros(board_state.shape)
 
         x, y = pos
         visited[x, y] = True
-
+        board_state[x, y] = self.id
         queue = [pos]
 
+        deltas = [
+            (0, 1),
+            (0, -1),
+            (1, 0),
+            (-1, 0)
+        ]
+
         while queue:
-            x, y = queue.pop(0)
+            x1, y1 = queue.pop(0)
 
             for dx, dy in deltas:
-                xv = x + dx
-                yv = y + dy
-
-                # if not visited and not obstacle
+                xv = x1 + dx
+                yv = y1 + dy
                 if (not visited[xv, yv]) and (board_state[xv, yv] == 0):
+                    distances[xv, yv] = distances[x1, y1] + 1
                     visited[xv, yv] = True
-                    distances[xv, yv] = distances[x, y] + 1
                     queue.append((xv, yv))
 
         return distances
+
 
 class SnakeGame:
 
@@ -232,7 +205,7 @@ class SnakeGame:
         elif self.state[x1, y1] != 0:
             return Result.LOSE
         elif self.state[x2, y2] != 0:
-            return Result.LOSE
+            return Result.WIN
         
         return False
 
@@ -242,14 +215,14 @@ class SnakeGame:
 
     def step(self):
 
-        m1 = self.agent1.step(self.state, self.pos1, self.pos2)
-        m2 = self.agent2.step(self.state, self.pos2, self.pos1)
-
         x1, y1 = self.pos1
         x2, y2 = self.pos2
 
         self.state[x1, y1] = self.agent1.id
         self.state[x2, y2] = self.agent2.id
+
+        m1 = self.agent1.step(self.state, self.pos1, self.pos2)
+        m2 = self.agent2.step(self.state, self.pos2, self.pos1)
 
         self.pos1 = self.move_update(self.pos1, m1)
         self.pos2 = self.move_update(self.pos2, m2)
@@ -336,8 +309,9 @@ class SnakeGame:
 
 
 if __name__ == "__main__":
-    agent1 = LazyAgent(id=1, start_move=Move.DOWN)
-    agent2 = VoronoiAgent(id=2, forward_steps=1)
+    # agent1 = LazyAgent(id=1, start_move=Move.DOWN)
+    agent1 = VoronoiAgent(id=1, forward_steps=1)
+    agent2 = VoronoiAgent(id=2, forward_steps=2)
 
     game = SnakeGame(agent1, agent2, n=50)
 
