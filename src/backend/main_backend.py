@@ -303,6 +303,7 @@ class SnakeGame:
         self.__dummy_agent = VoronoiAgent(2, 0)
         self.voronoi_ratios = []
         self.k = 0
+        self.compute_voronoi = False
 
     def reset(self):
 
@@ -339,39 +340,40 @@ class SnakeGame:
         x1, y1 = self.pos1
         x2, y2 = self.pos2
 
-        # bfs1 = self.__dummy_agent.bfs(self.pos1, self.state.copy())
-        # bfs2 = self.__dummy_agent.bfs(self.pos2, self.state.copy())
+        if self.compute_voronoi:
+            bfs1 = self.__dummy_agent.bfs(self.pos1, self.state.copy())
+            bfs2 = self.__dummy_agent.bfs(self.pos2, self.state.copy())
 
-        # interacting = ((bfs1 != 0) & (bfs2 != 0)).any()
+            interacting = ((bfs1 != 0) & (bfs2 != 0)).any()
 
-        # dummy_state1 = self.state.copy()
-        # dummy_state1[bfs1 < bfs2] = 0
-        # dummy_state1[bfs1 >= bfs2] = 1
-        # dummy_state1[self.state != 0] = 1
-        # paths = compute_paths(dummy_state1, (3, 3))
-        # try:
-        #     hamiltonian1 = max(paths, key=lambda l: len(l))
-        # except:
-        #     hamiltonian1 = []
+            dummy_state1 = self.state.copy()
+            dummy_state1[bfs1 < bfs2] = 0
+            dummy_state1[bfs1 >= bfs2] = 1
+            dummy_state1[self.state != 0] = 1
+            paths = compute_paths(dummy_state1, (3, 3))
+            try:
+                hamiltonian1 = max(paths, key=lambda l: len(l))
+            except:
+                hamiltonian1 = []
 
-        # dummy_state2 = self.state.copy()
-        # dummy_state2[bfs1 > bfs2] = 0
-        # dummy_state2[bfs1 <= bfs2] = 1
-        # dummy_state2[self.state != 0] = 1
-        # paths = compute_paths(dummy_state2, (3, 3))
-        # try:
-        #     hamiltonian2 = max(paths, key=lambda l: len(l))
-        # except:
-        #     hamiltonian2 = []
+            dummy_state2 = self.state.copy()
+            dummy_state2[bfs1 > bfs2] = 0
+            dummy_state2[bfs1 <= bfs2] = 1
+            dummy_state2[self.state != 0] = 1
+            paths = compute_paths(dummy_state2, (3, 3))
+            try:
+                hamiltonian2 = max(paths, key=lambda l: len(l))
+            except:
+                hamiltonian2 = []
 
-        # self.voronoi_ratios.append({
-        #     'k': self.k,
-        #     '1': (np.sum(dummy_state1 == 0), len(hamiltonian1)),
-        #     '2': (np.sum(dummy_state2 == 0), len(hamiltonian2)),
-        #     'interacting' : interacting
-        # })
+            self.voronoi_ratios.append({
+                'k': self.k,
+                '1': (np.sum(dummy_state1 == 0), len(hamiltonian1)),
+                '2': (np.sum(dummy_state2 == 0), len(hamiltonian2)),
+                'interacting' : interacting
+            })
 
-        # self.k += 1
+            self.k += 1
 
         self.state[x1, y1] = self.agent1.id
         self.state[x2, y2] = self.agent2.id
@@ -486,7 +488,6 @@ def compute_paths(G: np.array, pos, seen=None,path=None):
     return paths
 
 def generate_plot(data):
-    
     data.boxplot(column=['hamiltonian length'], by='voronoi cell size')
 
     cell_sizes = sorted(data['voronoi cell size'].unique().tolist())
@@ -514,11 +515,10 @@ def generate_plot_game_scores(data):
 
 if __name__ == "__main__":
 
-    # n = 5
-    # G = -np.ones((n+2, n+2))
-    # G[1:n+1, 1:n+1] = np.zeros((n, n))
-
     scores = []
+    ratios = []
+    num_repeats = 1
+    compute_voronoi = False
 
     opponents = [
         ("Random Walk", lambda: AvoidAgent(id=2)),
@@ -535,12 +535,13 @@ if __name__ == "__main__":
     ]
 
     for opp, a2 in opponents:
-        for i in range(100):
+        for i in range(num_repeats):
 
             agent1 = VoronoiAgent(id=1, forward_steps=1)
             agent2 = a2()
 
             game = SnakeGame(agent1, agent2, n=9)
+            game.compute_voronoi = compute_voronoi
             result = game.play()
             scores.append({
                 "score" : 1 if result == Result.WIN else 0,
@@ -549,101 +550,33 @@ if __name__ == "__main__":
                 "opponent" : opp
             })
 
-    df = pd.DataFrame(scores)
+            if compute_voronoi:
+                for d in game.voronoi_ratios:
+                    bfs1, h1 = d['1']
+                    bfs2, h2 = d['2']
 
+                    if h1 > 0 and bfs1 > 0:
+                        ratios.append({'hamiltonian length' : h1, 'voronoi cell size' : bfs1})
+
+                    if h2 > 0 and bfs2 > 0:
+                        ratios.append({'hamiltonian length' : h2, 'voronoi cell size' : bfs2})
+
+    # generate a sample game gif
+    agent1 = VoronoiAgent(id=1, forward_steps=1)
+    agent2 = EpsilonGreedyAgent(VoronoiAgent(id=2, forward_steps=1), epsilon=0.1)
+    game = SnakeGame(agent1, agent2, n=50)
+    result = game.play()
+    game.render_game("./data/game_viz.gif")
+
+    # print win statistics
+    df = pd.DataFrame(scores)
     print(df.groupby("opponent").agg(["mean", "std"]))
 
-    # generate_plot_game_scores(pd.DataFrame(scores))
-
-
-    # paths = compute_paths(G, (3, 3))
-    # hamiltonian = max(paths, key=lambda l: len(l))
-    # print(hamiltonian)
-
-    # agent1 = EpsilonGreedyAgent(LazyAgent(id=1, start_move=Move.DOWN), 0.1)
-    # agent2 = TabularAgent(id=2, n=50, gamma=0.99)
-    # agent1 = VoronoiAgent(id=1, forward_steps=1)
-    # agent2 = VoronoiAgent(id=2, forward_steps=2)
-    # agent2 = EpsilonGreedyAgent(LazyAgent(id=1, start_move=Move.DOWN), 0.1)
-
-    # ratios = []
-
-    # for i in range(1000):
-    #     agent1 = VoronoiAgent(id=1, forward_steps=1)
-    #     agent2 = EpsilonGreedyAgent(LazyAgent(id=1, start_move=Move.DOWN), 0.1)
-
-    #     game = SnakeGame(agent1, agent2, n=6)
-    #     result = game.play()
-
-    #     for d in game.voronoi_ratios:
-    #         bfs1, h1 = d['1']
-    #         bfs2, h2 = d['2']
-
-    #         if h1 > 0 and bfs1 > 0:
-    #             ratios.append({'hamiltonian length' : h1, 'voronoi cell size' : bfs1})
-
-    #         if h2 > 0 and bfs2 > 0:
-    #             ratios.append({'hamiltonian length' : h2, 'voronoi cell size' : bfs2})
-
-    #     # =========
-    #     agent1 = VoronoiAgent(id=1, forward_steps=1)
-    #     agent2 = VoronoiAgent(id=2, forward_steps=1)
-
-    #     game = SnakeGame(agent1, agent2, n=6)
-    #     result = game.play()
-
-    #     for d in game.voronoi_ratios:
-    #         bfs1, h1 = d['1']
-    #         bfs2, h2 = d['2']
-
-    #         if h1 > 0 and bfs1 > 0:
-    #             ratios.append({'hamiltonian length' : h1, 'voronoi cell size' : bfs1})
-
-    #         if h2 > 0 and bfs2 > 0:
-    #             ratios.append({'hamiltonian length' : h2, 'voronoi cell size' : bfs2})
-
-    #     # =========
-    #     agent1 = EpsilonGreedyAgent(LazyAgent(id=1, start_move=Move.DOWN), 0.1)
-    #     agent2 = EpsilonGreedyAgent(LazyAgent(id=2, start_move=Move.DOWN), 0.1)
-
-    #     game = SnakeGame(agent1, agent2, n=6)
-    #     result = game.play()
-
-    #     for d in game.voronoi_ratios:
-    #         bfs1, h1 = d['1']
-    #         bfs2, h2 = d['2']
-
-    #         if h1 > 0 and bfs1 > 0:
-    #             ratios.append({'hamiltonian length' : h1, 'voronoi cell size' : bfs1})
-
-    #         if h2 > 0 and bfs2 > 0:
-    #             ratios.append({'hamiltonian length' : h2, 'voronoi cell size' : bfs2})
-
-    # generate_plot(pd.DataFrame(ratios))
-
-    # print(f"Player 1 : {result}")
-    # game.render_game("./data/approx_1.gif")
+    # use this to generate win percentage plots and voronoi plots
+    generate_plot_game_scores(pd.DataFrame(scores))
+    if compute_voronoi:
+        generate_plot(pd.DataFrame(ratios))
 
     
 
-    # for _ in range(training_iterations):
-    #     agent2.reset_history()
-    #     game.reset()
-
-    #     result = game.play()
-
-    #     if result == Result.WIN :
-    #         r = -1
-    #     elif result == Result.TIE:
-    #         r = -1
-    #     else:
-    #         r = 1
-
-    #     agent2.update_weights(r)
-
-    # game.reset()
-    # result = game.play()
-    # print(f"Player 1 : {result}")
-    # game.render_game("./data/approx_n.gif")
-
-
+    
