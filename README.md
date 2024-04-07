@@ -18,6 +18,6 @@ To run the script, execute `make run_script`.
 ![Game examples](data/game_viz.gif "Two Voronoi Agents")
 
 
-## Analytical Solution
+## Neural Network Solution
 
 Please navigate to https://github.com/JeliPenguin/COMP0124-N-Snake-NeuralNetwork/tree/main to see the Neural Network agents for the N-Snake game.
